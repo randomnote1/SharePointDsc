@@ -67,6 +67,12 @@
             "metadata": {
                 "description": "The password to use for all accounts"
             }
+        },
+        "createFarm" : {
+            "type": "bool",
+            "metadata": {
+                "description": "Create the farm after the SDharePoint bits have been installed."
+            }
         }
     },
     "variables": {

@@ -40,15 +40,18 @@ This will automatically be suffixed with the Azure location name and azure DNS s
 The username and password to use as the local administrator on all machines. The password
 on this account will also be used for all service accounts
 
+.PARAMETER CreateFarm
+Create the farm after the SDharePoint bits have been installed.
+
 .EXAMPLE
-New-SPDscAzureLab -ResourceGroupName "SPDSCTestLab" `
+New-SPDscAzureLab -ResourceGroupName SPDSCTestLab `
                   -Location southeastasia `
-                  -StorageAccountName "spdsctestlab1" `
-                  -SoftwareStorageAccountName "spdscsoftware1" `
-                  -SoftwareStorageAccountContainer "sharepoint2016" `
-                  -SharePointProductKey "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA" `
-                  -PublicDNSLabel "spdsctestlab1" `
-                  -AdminCredential (Get-Credential -Message "Enter admin credential")
+                  -StorageAccountName spdsctestlab1 `
+                  -SoftwareStorageAccountName spdscsoftware1 `
+                  -SoftwareStorageAccountContainer sharepoint2016 `
+                  -SharePointProductKey 'AAAAA-AAAAA-AAAAA-AAAAA-AAAAA' `
+                  -PublicDNSLabel spdsctestlab1 `
+                  -AdminCredential (Get-Credential -Message 'Enter admin credential')
 
 .NOTES
 This cmdlet requires that the Azure PowerShell cmdlets are already installed, and that you
@@ -88,7 +91,11 @@ function New-SPDscAzureLab
 
         [Parameter(Mandatory = $true)]
         [PSCredential]
-        $AdminCredential
+        $AdminCredential,
+
+        [Parameter()]
+        [Switch]
+        $CreateFarm
     )
 
     # Get the Azure environment
@@ -103,7 +110,7 @@ function New-SPDscAzureLab
                                                 -Location $Location
 
     # Publish the DSC configurations
-    $dscConfigPath = Join-Path -Path $PSScriptRoot -ChildPath "DscConfigs"
+    $dscConfigPath = Join-Path -Path $PSScriptRoot -ChildPath DscConfigs
     Get-ChildItem -Path $dscConfigPath | ForEach-Object -Process {
         Publish-AzureRmVMDscConfiguration -ConfigurationPath $_.FullName `
                                           -ResourceGroupName $ResourceGroupName `
@@ -111,11 +118,11 @@ function New-SPDscAzureLab
     }
 
     # Publish the scripts
-    New-AzureStorageContainer -Name "scripts" -Context $storageAccount.Context
-    $scriptsPath = Join-Path -Path $PSScriptRoot -ChildPath "CustomScripts"
+    New-AzureStorageContainer -Name scripts -Context $storageAccount.Context
+    $scriptsPath = Join-Path -Path $PSScriptRoot -ChildPath CustomScripts
     Get-ChildItem -Path $scriptsPath | ForEach-Object -Process {
         Set-AzureStorageBlobContent -File $_.FullName `
-                                    -Container "scripts" `
+                                    -Container scripts `
                                     -Blob $_.Name `
                                     -Context $storageAccount.Context
     }
@@ -127,7 +134,7 @@ function New-SPDscAzureLab
                                                   -StorageAccountKey $mainKeys[0].Value
     $mainSasToken = New-AzureStorageAccountSASToken -Service Blob `
                                                     -ResourceType Service,Container,Object `
-                                                    -Permission "racwdlup" `
+                                                    -Permission racwdlup `
                                                     -Context $mainStorageContext
 
     # Get keys for software storage
@@ -137,21 +144,22 @@ function New-SPDscAzureLab
 
 
     $parameters = @{}
-    $parameters.Add("azureEnvironment", $azureEnvironment)
-    $parameters.Add("storageAccountName", $StorageAccountName)
-    $parameters.Add("storageAccountKey", $mainKeys[0].Value)
-    $parameters.Add("softwareStorageAccount", $SoftwareStorageAccountName)
-    $parameters.Add("softwareStorageKey", $softwareKeys[0].Value)
-    $parameters.Add("softwareStorageContainer", $SoftwareStorageAccountContainer)
-    $parameters.Add("spProductKey", $SharePointProductKey)
-    $parameters.Add("adminUserName", $AdminCredential.UserName)
-    $parameters.Add("adminPassword", $AdminCredential.GetNetworkCredential().Password)
-    $parameters.Add("mainStorageToken", $mainSasToken)
-    $parameters.Add("publicDnsLabel", $PublicDNSLabel)
+    $parameters.Add('azureEnvironment', $azureEnvironment)
+    $parameters.Add('storageAccountName', $StorageAccountName)
+    $parameters.Add('storageAccountKey', $mainKeys[0].Value)
+    $parameters.Add('softwareStorageAccount', $SoftwareStorageAccountName)
+    $parameters.Add('softwareStorageKey', $softwareKeys[0].Value)
+    $parameters.Add('softwareStorageContainer', $SoftwareStorageAccountContainer)
+    $parameters.Add('spProductKey', $SharePointProductKey)
+    $parameters.Add('adminUserName', $AdminCredential.UserName)
+    $parameters.Add('adminPassword', $AdminCredential.GetNetworkCredential().Password)
+    $parameters.Add('mainStorageToken', $mainSasToken)
+    $parameters.Add('publicDnsLabel', $PublicDNSLabel)
+    $parameters.Add('createFarm', $CreateFarm)
 
     # Start the ARM deployment
-    $templatePath = Join-Path -Path $PSScriptRoot -ChildPath "template.json"
-    New-AzureRmResourceGroupDeployment -Name "SPDscLab" `
+    $templatePath = Join-Path -Path $PSScriptRoot -ChildPath template.json
+    New-AzureRmResourceGroupDeployment -Name SPDscLab `
                                        -TemplateFile $templatePath `
                                        -ResourceGroupName $ResourceGroupName `
                                        -TemplateParameterObject $parameters `
